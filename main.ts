@@ -13,8 +13,12 @@ namespace OLED {
         0x000e085e, 0x00064a4c, 0x0002295e, 0x000f2944, 0x0001085c, 0x00012a90, 0x010a51e0, 0x010f420e, 0x00644106, 0x01e8221e,
         0x00093192, 0x00222292, 0x00095b52, 0x0008fc80, 0x000003e0, 0x000013f1, 0x00841080, 0x0022d422];
 
+    let PAGE_NUM = 8
+    let COLUMN_NUM = 132
+    let FONT_SIZE = 5
+
     let _I2CAddr = 0;
-    let _screen = pins.createBuffer(1025);
+    let _screen = pins.createBuffer(1057);
     let _buf2 = pins.createBuffer(2);
     let _buf3 = pins.createBuffer(3);
     let _buf4 = pins.createBuffer(4);
@@ -66,7 +70,7 @@ namespace OLED {
     //% parts=OLED trackArgs=0
     export function pixel(x: number, y: number, color: number = 1) {
         let page = y >> 3
-        let shift_page = y % 8
+        let shift_page = y % PAGE_NUM
         let ind = x * (_ZOOM + 1) + page * 128 + 1
         let b = (color) ? (_screen[ind] | (1 << shift_page)) : clrbit(_screen[ind], shift_page)
         _screen[ind] = b
@@ -102,13 +106,13 @@ namespace OLED {
         let stringLength = s.length <= maxLength ? s.length : maxLength
         for (let stringNo = 0; stringNo < stringLength; stringNo++) {
             p = font[s.charCodeAt(stringNo)]
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < FONT_SIZE; i++) {
                 col = 0
-                for (let j = 0; j < 5; j++) {
-                    if (p & (1 << (5 * i + j)))
+                for (let j = 0; j < FONT_SIZE; j++) {
+                    if (p & (1 << (FONT_SIZE * i + j)))
                         col |= (1 << (j + 1))
                 }
-                ind2 = (x + stringNo) * 5 * (_ZOOM + 1) + y * 128 + i * (_ZOOM + 1) + 1
+                ind2 = (x + stringNo) * FONT_SIZE * (_ZOOM + 1) + y * 128 + i * (_ZOOM + 1) + 1
                 if (color == 0)
                     col = 255 - col
                 _screen[ind2] = col
@@ -116,8 +120,8 @@ namespace OLED {
                     _screen[ind2 + 1] = col
             }
         }
-        set_pos(x * 5, y)
-        let indX = x * 5 * (_ZOOM + 1) + y * 128
+        set_pos(x * FONT_SIZE, y)
+        let indX = x * FONT_SIZE * (_ZOOM + 1) + y * 128
         let buf = _screen.slice(indX, ind2 + 1)
         buf.shift(-1)
         buf[0] = 0x40
@@ -227,13 +231,9 @@ namespace OLED {
     //% weight=64 blockGap=8
     //% parts=OLED trackArgs=0
     export function draw() {
-        for (let drawPage = 0; drawPage <= 7; drawPage++) {
+        for (let drawPage = 0; drawPage < PAGE_NUM; drawPage++) {
             set_pos(0, drawPage)
-            let drawBuf = pins.createBuffer(129)
-            drawBuf = _screen.slice(drawPage * 128 + 1, (drawPage + 1) * 128)
-            drawBuf.shift(-1)
-            drawBuf[0] = 0x40
-            pins.i2cWriteBuffer(_I2CAddr, drawBuf)
+            pins.i2cWriteBuffer(_I2CAddr, _screen)
         }
     }
 
