@@ -12,13 +12,14 @@ namespace OLED {
         0x000fd288, 0x000956ae, 0x000097c4, 0x0007d6a2, 0x000c109f, 0x000003a0, 0x0006c200, 0x0008289f, 0x000841e0, 0x01e1105e,
         0x000e085e, 0x00064a4c, 0x0002295e, 0x000f2944, 0x0001085c, 0x00012a90, 0x010a51e0, 0x010f420e, 0x00644106, 0x01e8221e,
         0x00093192, 0x00222292, 0x00095b52, 0x0008fc80, 0x000003e0, 0x000013f1, 0x00841080, 0x0022d422];
+    // 0x0022d422 -> "?"
 
     let PAGE_NUM = 8
     let COLUMN_NUM = 132
     let FONT_SIZE = 5
 
     let _I2CAddr = 0;
-    let _screen = pins.createBuffer(1057);
+    let _screen = pins.createBuffer(PAGE_NUM * COLUMN_NUM + 1);
     let _buf2 = pins.createBuffer(2);
     let _buf3 = pins.createBuffer(3);
     let _buf4 = pins.createBuffer(4);
@@ -59,6 +60,30 @@ namespace OLED {
         return d
     }
 
+    function setBitColor(buffer:number, page:number, color:number): number {
+        if(color) {
+            return buffer | (1 << page)
+        }
+        else {
+            return clrbit(buffer, page)
+        }
+    }
+
+    //% blockId="TEST_CODE" block="test code"
+    //% weight=70 blockGap=8
+    //% parts=OLED trackArgs=0
+    export function testCode() {
+        for (let i = 0; i < 8; i++) {
+            OLED.showString(
+                0,
+                i,
+                "Hello!World!3456789012345",
+                1
+            )
+        }
+    }
+
+
     /**
      * set pixel in OLED
      * @param x is X alis, eg: 0
@@ -69,10 +94,11 @@ namespace OLED {
     //% weight=70 blockGap=8
     //% parts=OLED trackArgs=0
     export function pixel(x: number, y: number, color: number = 1) {
-        let page = y >> 3
-        let shift_page = y % PAGE_NUM
-        let ind = x * (_ZOOM + 1) + page * 128 + 1
-        let b = (color) ? (_screen[ind] | (1 << shift_page)) : clrbit(_screen[ind], shift_page)
+        if (x < 0 || x > 128 || y < 0 || y > 62) return
+        let page = y >> 3               // ページ数(0-7)
+        let shift_page = y % PAGE_NUM   // ページ中の行数(0-7)
+        let ind = x * (_ZOOM + 1) + page * COLUMN_NUM + 1
+        let b = setBitColor(_screen[ind], shift_page, color)
         _screen[ind] = b
         set_pos(x, page)
         if (_ZOOM) {
@@ -100,32 +126,33 @@ namespace OLED {
     //% parts=OLED trackArgs=0
     export function showString(x: number, y: number, s: string, color: number = 1) {
         let col = 0
-        let p = 0
-        let ind2 = 0
-        let maxLength = _ZOOM ? 12 : 25
+        let fontData = 0
+        let screenIdx = 0
+        let maxLength = _ZOOM ? 12 : 25　// 1行当たりの最大文字数
         let stringLength = s.length <= maxLength ? s.length : maxLength
         for (let stringNo = 0; stringNo < stringLength; stringNo++) {
-            p = font[s.charCodeAt(stringNo)]
+            fontData = font[s.charCodeAt(stringNo)]
             for (let i = 0; i < FONT_SIZE; i++) {
                 col = 0
                 for (let j = 0; j < FONT_SIZE; j++) {
-                    if (p & (1 << (FONT_SIZE * i + j)))
+                    if (fontData & (1 << (FONT_SIZE * i + j)))
                         col |= (1 << (j + 1))
                 }
-                ind2 = (x + stringNo) * FONT_SIZE * (_ZOOM + 1) + y * 128 + i * (_ZOOM + 1) + 1
+                screenIdx = (x + stringNo) * FONT_SIZE * (_ZOOM + 1) + y * COLUMN_NUM + i * (_ZOOM + 1) + 1
                 if (color == 0)
                     col = 255 - col
-                _screen[ind2] = col
+                _screen[screenIdx] = col
                 if (_ZOOM)
-                    _screen[ind2 + 1] = col
+                    _screen[screenIdx + 1] = col
             }
         }
         set_pos(x * FONT_SIZE, y)
-        let indX = x * FONT_SIZE * (_ZOOM + 1) + y * 128
-        let buf = _screen.slice(indX, ind2 + 1)
+        let startIdx = x * FONT_SIZE * (_ZOOM + 1) + y * COLUMN_NUM + 1
+        let buf = _screen.slice(startIdx, screenIdx + 1)
         buf.shift(-1)
         buf[0] = 0x40
         pins.i2cWriteBuffer(_I2CAddr, buf)
+        draw()  // 本当は無くしたい（1～6行目が上手く表示されない…）
     }
 
     /**
@@ -207,7 +234,7 @@ namespace OLED {
     //% parts=OLED trackArgs=0
     export function fillRect(x1: number, y1: number, x2: number, y2: number, color: number = 1) {
         for (let x = x1; x <= x2; x++) {
-            for (let y = y1; y <= y2; y++) {
+        for (let y = y1; y <= y2; y++) {
                 pixel(x, y)
             }
         }
@@ -233,8 +260,17 @@ namespace OLED {
     export function draw() {
         for (let drawPage = 0; drawPage < PAGE_NUM; drawPage++) {
             set_pos(0, drawPage)
-            pins.i2cWriteBuffer(_I2CAddr, _screen)
+            let ind = drawPage * COLUMN_NUM + 1
+            let buf = _screen.slice(ind, COLUMN_NUM - 1)
+            buf.shift(-1)
+            buf[0] = 0x40
+            pins.i2cWriteBuffer(_I2CAddr, buf)
         }
+    }
+
+    function clearData() {
+        _screen.fill(0)
+        _screen[0] = 0x40
     }
 
     /**
@@ -244,7 +280,21 @@ namespace OLED {
     //% weight=63 blockGap=8
     //% parts=OLED trackArgs=0
     export function clear() {
-        _screen.fill(0)
+        clearData()
+        draw()
+    }
+
+    /**
+     * fill screen
+     */
+    //% blockId="OLED_FILL_SCREEN" block="fillScreen"
+    //% weight=63 blockGap=8
+    //% parts=OLED trackArgs=0
+    export function fillScreen() {
+        _screen.fill(255)
+        for (let i = (PAGE_NUM - 1) * COLUMN_NUM; i <PAGE_NUM * COLUMN_NUM; i++) {
+            _screen[i] = 127    // 最後の1行だけ消す
+        }
         _screen[0] = 0x40
         draw()
     }
