@@ -73,16 +73,14 @@ namespace OLED {
     //% weight=70 blockGap=8
     //% parts=OLED trackArgs=0
     export function testCode() {
-        for (let i = 0; i < 8; i++) {
-            OLED.showString(
-                0,
-                i,
-                "Hello!World!3456789012345",
-                1
-            )
-        }
+        showImage(1)
+        OLED.showString(
+            10,
+            7,
+            "Hello!",
+            1
+        )
     }
-
 
     /**
      * set pixel in OLED
@@ -127,28 +125,28 @@ namespace OLED {
     export function showString(x: number, y: number, s: string, color: number = 1) {
         let col = 0
         let fontData = 0
-        let screenIdx = 0
+        let screenIdx2 = 0
         let maxLength = _ZOOM ? 12 : 25　// 1行当たりの最大文字数
         let stringLength = s.length <= maxLength ? s.length : maxLength
         for (let stringNo = 0; stringNo < stringLength; stringNo++) {
             fontData = font[s.charCodeAt(stringNo)]
-            for (let i = 0; i < FONT_SIZE; i++) {
+            for (let j = 0; j < FONT_SIZE; j++) {
                 col = 0
-                for (let j = 0; j < FONT_SIZE; j++) {
-                    if (fontData & (1 << (FONT_SIZE * i + j)))
-                        col |= (1 << (j + 1))
+                for (let k = 0; k < FONT_SIZE; k++) {
+                    if (fontData & (1 << (FONT_SIZE * j + k)))
+                        col |= (1 << (k + 1))
                 }
-                screenIdx = (x + stringNo) * FONT_SIZE * (_ZOOM + 1) + y * COLUMN_NUM + i * (_ZOOM + 1) + 1
+                screenIdx2 = (x + stringNo) * FONT_SIZE * (_ZOOM + 1) + y * COLUMN_NUM + j * (_ZOOM + 1) + 1
                 if (color == 0)
                     col = 255 - col
-                _screen[screenIdx] = col
+                _screen[screenIdx2] = col
                 if (_ZOOM)
-                    _screen[screenIdx + 1] = col
+                    _screen[screenIdx2 + 1] = col
             }
         }
         set_pos(x * FONT_SIZE, y)
         let startIdx = x * FONT_SIZE * (_ZOOM + 1) + y * COLUMN_NUM + 1
-        let buf = _screen.slice(startIdx, screenIdx + 1)
+        let buf = _screen.slice(startIdx, screenIdx2 + 1)
         buf.shift(-1)
         buf[0] = 0x40
         pins.i2cWriteBuffer(_I2CAddr, buf)
@@ -180,8 +178,8 @@ namespace OLED {
     //% weight=71 blockGap=8
     //% parts=OLED trackArgs=0
     export function hline(x: number, y: number, len: number, color: number = 1) {
-        for (let k = x; k < (x + len); k++)
-            pixel(k, y, color)
+        for (let l = x; l < (x + len); l++)
+            pixel(l, y, color)
     }
 
     /**
@@ -195,8 +193,8 @@ namespace OLED {
     //% weight=72 blockGap=8
     //% parts=OLED trackArgs=0
     export function vline(x: number, y: number, len: number, color: number = 1) {
-        for (let l = y; l < (y + len); l++)
-            pixel(x, l, color)
+        for (let m = y; m < (y + len); m++)
+            pixel(x, m, color)
     }
 
     /**
@@ -260,11 +258,11 @@ namespace OLED {
     export function draw() {
         for (let drawPage = 0; drawPage < PAGE_NUM; drawPage++) {
             set_pos(0, drawPage)
-            let ind = drawPage * COLUMN_NUM + 1
-            let buf = _screen.slice(ind, COLUMN_NUM - 1)
-            buf.shift(-1)
-            buf[0] = 0x40
-            pins.i2cWriteBuffer(_I2CAddr, buf)
+            let ind22 = drawPage * COLUMN_NUM + 1
+            let buf22 = _screen.slice(ind22, COLUMN_NUM - 1)
+            buf22.shift(-1)
+            buf22[0] = 0x40
+            pins.i2cWriteBuffer(_I2CAddr, buf22)
         }
     }
 
@@ -292,11 +290,36 @@ namespace OLED {
     //% parts=OLED trackArgs=0
     export function fillScreen() {
         _screen.fill(255)
-        for (let i = (PAGE_NUM - 1) * COLUMN_NUM; i <PAGE_NUM * COLUMN_NUM; i++) {
-            _screen[i] = 127    // 最後の1行だけ消す
+        for (let o = (PAGE_NUM - 1) * COLUMN_NUM; o <PAGE_NUM * COLUMN_NUM; o++) {
+            _screen[o] = 127    // 最後の1行だけ消す
         }
         _screen[0] = 0x40
         draw()
+    }
+
+
+    /**
+     * show image
+     * @param x is X alis, eg: 0
+     */
+    //% blockId="OLED_SHOW_IMAGE" block="show image at imageNo %imageNo"
+    //% weight=70 blockGap=8
+    //% parts=OLED trackArgs=0
+    export function showImage(imageNo: number) {
+        for (let drawPage = 0; drawPage < PAGE_NUM; drawPage++) {
+            for (let i = 0; i < COLUMN_NUM; i++) {
+                let screenIdx = i + drawPage * COLUMN_NUM
+                let imageIdx = i + drawPage * 128
+                if (imageNo = 1) _screen[screenIdx] = OLED_IMAGE.face1[imageIdx];
+                else _screen[screenIdx] = OLED_IMAGE.face2[imageIdx];
+            }
+            set_pos(0, drawPage)
+            let ind2 = drawPage * COLUMN_NUM + 1
+            let buf2 = _screen.slice(ind2, COLUMN_NUM - 1)
+            buf2.shift(-1)
+            buf2[0] = 0x40
+            pins.i2cWriteBuffer(_I2CAddr, buf2)
+        }
     }
 
     /**
