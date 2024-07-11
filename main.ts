@@ -73,7 +73,7 @@ namespace OLED {
     //% weight=70 blockGap=8
     //% parts=OLED trackArgs=0
     export function testCode() {
-        showImage(1)
+        showImage(2)
         OLED.showString(
             10,
             7,
@@ -310,7 +310,7 @@ namespace OLED {
             for (let i = 0; i < COLUMN_NUM; i++) {
                 let screenIdx = i + drawPage * COLUMN_NUM
                 let imageIdx = i + drawPage * 128
-                if (imageNo = 1) _screen[screenIdx] = OLED_IMAGE.face1[imageIdx];
+                if (imageNo == 1) _screen[screenIdx] = OLED_IMAGE.face1[imageIdx];
                 else _screen[screenIdx] = OLED_IMAGE.face2[imageIdx];
             }
             set_pos(0, drawPage)
